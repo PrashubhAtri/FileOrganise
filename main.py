@@ -31,35 +31,12 @@ def list_backups(path):
     return backups
 
 def restore_directory_structure(path, backup_name):
-    backup_path = os.path.join(path, backup_name)
-    if not os.path.exists(backup_path):
-        print("Backup not found.")
-        return
-
-    # Clear the current directory except for the backup folder
-    for item in os.listdir(path):
-        item_path = os.path.join(path, item)
-        if item != backup_name:
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            else:
-                os.remove(item_path)
-
-    # Restore the directory structure from the backup
-    for root, dirs, _ in os.walk(backup_path):
-        relative_path = os.path.relpath(root, backup_path)
-        restore_subdir = os.path.join(path, relative_path)
-        for dir_name in dirs:
-            os.makedirs(os.path.join(restore_subdir, dir_name), exist_ok=True)
-    print(f"Restored directory structure from {backup_name}")
+    # Temporarily disable restore functionality
+    pass
 
 def delete_backup(path, backup_name):
-    backup_path = os.path.join(path, backup_name)
-    if os.path.exists(backup_path):
-        shutil.rmtree(backup_path)
-        print(f"Deleted backup {backup_name}")
-    else:
-        print("Backup not found.")
+    # Temporarily disable delete functionality
+    pass
 
 def organize_files_by_extension(path, files, exceptions):
     move_log = []  # List to store move operations for undo
@@ -160,32 +137,10 @@ if __name__ == "__main__":
             # Create a backup of the directory structure (currently disabled)
             backup_directory_structure(full_path)
         elif action == 'restore':
-            # List available backups
-            backups = list_backups(full_path)
-            if backups:
-                # Ask the user to select a backup to restore
-                choice = input("Enter the number of the backup to restore: ").strip()
-                try:
-                    choice_index = int(choice) - 1
-                    if 0 <= choice_index < len(backups):
-                        restore_directory_structure(full_path, backups[choice_index])
-                    else:
-                        print("Invalid choice.")
-                except ValueError:
-                    print("Invalid input. Please enter a number.")
+            # Restore functionality is currently disabled
+            restore_directory_structure(full_path, None)
         elif action == 'delete':
-            # List available backups
-            backups = list_backups(full_path)
-            if backups:
-                # Ask the user to select a backup to delete
-                choice = input("Enter the number of the backup to delete: ").strip()
-                try:
-                    choice_index = int(choice) - 1
-                    if 0 <= choice_index < len(backups):
-                        delete_backup(full_path, backups[choice_index])
-                    else:
-                        print("Invalid choice.")
-                except ValueError:
-                    print("Invalid input. Please enter a number.")
+            # Delete functionality is currently disabled
+            delete_backup(full_path, None)
         else:
             print("Invalid action. Please enter 'org', 'undo', 'backup', 'restore', or 'delete'.")
