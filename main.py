@@ -29,6 +29,48 @@ def backup_directory(path):
         print(f"Failed to create backup: {e}")
         return None
 
+def list_backups(path):
+    backups = [d for d in os.listdir(path) if d.startswith(os.path.basename(path) + "_backup_")]
+    if not backups:
+        print("No backups found.")
+    else:
+        print("Available backups:")
+        for i, backup in enumerate(backups, 1):
+            print(f"{i}. {backup}")
+    return backups
+
+def restore_backup(path, backup_name):
+    backup_path = os.path.join(path, backup_name)
+    if not os.path.exists(backup_path):
+        print("Backup not found.")
+        return
+
+    # Clear the current directory
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        if os.path.isdir(item_path):
+            shutil.rmtree(item_path)
+        else:
+            os.remove(item_path)
+
+    # Copy the backup to the original location
+    for item in os.listdir(backup_path):
+        s = os.path.join(backup_path, item)
+        d = os.path.join(path, item)
+        if os.path.isdir(s):
+            shutil.copytree(s, d)
+        else:
+            shutil.copy2(s, d)
+    print(f"Restored backup from {backup_name}")
+
+def delete_backup(path, backup_name):
+    backup_path = os.path.join(path, backup_name)
+    if os.path.exists(backup_path):
+        shutil.rmtree(backup_path)
+        print(f"Deleted backup {backup_name}")
+    else:
+        print("Backup not found.")
+
 def organize_files_by_extension(path, files, exceptions):
     move_log = []  # List to store move operations for undo
 
@@ -91,8 +133,8 @@ if __name__ == "__main__":
     # Append '~/'
     full_path = os.path.expanduser(f"~/{user_input}")
     
-    # Ask the user if they want to organize or undo
-    action = input("Enter 'org' to organize files or 'undo' to undo the last organization: ").strip().lower()
+    # Ask the user for the desired action
+    action = input("Enter 'org' to organize files, 'undo' to undo the last organization, 'backup' to create a backup, 'restore' to restore from a backup, or 'delete' to delete a backup: ").strip().lower()
     
     if action == 'org':
         # Create a backup of the directory
@@ -111,5 +153,36 @@ if __name__ == "__main__":
     elif action == 'undo':
         # Undo the last organization
         undo_last_organization(full_path)
+    elif action == 'backup':
+        # Create a backup of the directory
+        backup_directory(full_path)
+    elif action == 'restore':
+        # List available backups
+        backups = list_backups(os.path.dirname(full_path))
+        if backups:
+            # Ask the user to select a backup to restore
+            choice = input("Enter the number of the backup to restore: ").strip()
+            try:
+                choice_index = int(choice) - 1
+                if 0 <= choice_index < len(backups):
+                    restore_backup(full_path, backups[choice_index])
+                else:
+                    print("Invalid choice.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+    elif action == 'delete':
+        # List available backups
+        backups = list_backups(os.path.dirname(full_path))
+        if backups:
+            # Ask the user to select a backup to delete
+            choice = input("Enter the number of the backup to delete: ").strip()
+            try:
+                choice_index = int(choice) - 1
+                if 0 <= choice_index < len(backups):
+                    delete_backup(os.path.dirname(full_path), backups[choice_index])
+                else:
+                    print("Invalid choice.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
     else:
-        print("Invalid action. Please enter 'org' or 'undo'.")
+        print("Invalid action. Please enter 'org', 'undo', 'backup', 'restore', or 'delete'.")
