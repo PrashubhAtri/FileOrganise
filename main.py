@@ -1,6 +1,7 @@
 import os
 import shutil
 import json
+from datetime import datetime
 
 def print_welcome_message():
     print("Welcome to File Organizer")
@@ -15,12 +16,25 @@ def list_files_in_directory(path):
         print(f"An error occurred: {e}")
         return []
 
-def organize_files_by_extension(path, files):
+def backup_directory(path):
+    # Create a backup directory with a timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = f"{path}_backup_{timestamp}"
+    
+    try:
+        shutil.copytree(path, backup_path)
+        print(f"Backup created at {backup_path}")
+        return backup_path
+    except Exception as e:
+        print(f"Failed to create backup: {e}")
+        return None
+
+def organize_files_by_extension(path, files, exceptions):
     move_log = []  # List to store move operations for undo
 
     for file in files:
-        # Skip directories and the move_log.json file
-        if os.path.isdir(os.path.join(path, file)) or file == 'move_log.json':
+        # Skip directories and files in the exceptions list
+        if os.path.isdir(os.path.join(path, file)) or file in exceptions:
             continue
         
         # Get file extension
@@ -81,11 +95,19 @@ if __name__ == "__main__":
     action = input("Enter 'org' to organize files or 'undo' to undo the last organization: ").strip().lower()
     
     if action == 'org':
+        # Create a backup of the directory
+        backup_path = backup_directory(full_path)
+        
+        # Define exceptions
+        exceptions = ['move_log.json']
+        if backup_path:
+            exceptions.append(os.path.basename(backup_path))
+        
         # List files in the directory
         files = list_files_in_directory(full_path)
         
         # Organize files by their extensions
-        organize_files_by_extension(full_path, files)
+        organize_files_by_extension(full_path, files, exceptions)
     elif action == 'undo':
         # Undo the last organization
         undo_last_organization(full_path)
