@@ -16,21 +16,12 @@ def list_files_in_directory(path):
         print(f"An error occurred: {e}")
         return []
 
-def backup_directory(path):
-    # Create a backup directory with a timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = f"{path}_backup_{timestamp}"
-    
-    try:
-        shutil.copytree(path, backup_path)
-        print(f"Backup created at {backup_path}")
-        return backup_path
-    except Exception as e:
-        print(f"Failed to create backup: {e}")
-        return None
+def backup_directory_structure(path):
+    # Temporarily disable backup functionality
+    pass
 
 def list_backups(path):
-    backups = [d for d in os.listdir(path) if d.startswith(os.path.basename(path) + "_backup_")]
+    backups = [d for d in os.listdir(path) if d.startswith("structure_backup_")]
     if not backups:
         print("No backups found.")
     else:
@@ -39,29 +30,28 @@ def list_backups(path):
             print(f"{i}. {backup}")
     return backups
 
-def restore_backup(path, backup_name):
+def restore_directory_structure(path, backup_name):
     backup_path = os.path.join(path, backup_name)
     if not os.path.exists(backup_path):
         print("Backup not found.")
         return
 
-    # Clear the current directory
+    # Clear the current directory except for the backup folder
     for item in os.listdir(path):
         item_path = os.path.join(path, item)
-        if os.path.isdir(item_path):
-            shutil.rmtree(item_path)
-        else:
-            os.remove(item_path)
+        if item != backup_name:
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
 
-    # Copy the backup to the original location
-    for item in os.listdir(backup_path):
-        s = os.path.join(backup_path, item)
-        d = os.path.join(path, item)
-        if os.path.isdir(s):
-            shutil.copytree(s, d)
-        else:
-            shutil.copy2(s, d)
-    print(f"Restored backup from {backup_name}")
+    # Restore the directory structure from the backup
+    for root, dirs, _ in os.walk(backup_path):
+        relative_path = os.path.relpath(root, backup_path)
+        restore_subdir = os.path.join(path, relative_path)
+        for dir_name in dirs:
+            os.makedirs(os.path.join(restore_subdir, dir_name), exist_ok=True)
+    print(f"Restored directory structure from {backup_name}")
 
 def delete_backup(path, backup_name):
     backup_path = os.path.join(path, backup_name)
@@ -73,6 +63,7 @@ def delete_backup(path, backup_name):
 
 def organize_files_by_extension(path, files, exceptions):
     move_log = []  # List to store move operations for undo
+    created_dirs = []  # List to store newly created directories
 
     for file in files:
         # Skip directories and files in the exceptions list
@@ -86,7 +77,9 @@ def organize_files_by_extension(path, files, exceptions):
         if extension:  # Only proceed if there's an extension
             # Create a directory for the extension if it doesn't exist
             extension_dir = os.path.join(path, extension)
-            os.makedirs(extension_dir, exist_ok=True)
+            if not os.path.exists(extension_dir):
+                os.makedirs(extension_dir, exist_ok=True)
+                created_dirs.append(extension_dir)  # Track newly created directories
             
             # Move the file into the respective directory
             source = os.path.join(path, file)
@@ -97,9 +90,9 @@ def organize_files_by_extension(path, files, exceptions):
             # Log the move operation
             move_log.append({'source': source, 'destination': destination})
 
-    # Save the move log to a file
+    # Save the move log and created directories to a file
     with open(os.path.join(path, 'move_log.json'), 'w') as log_file:
-        json.dump(move_log, log_file)
+        json.dump({'moves': move_log, 'created_dirs': created_dirs}, log_file)
 
 def undo_last_organization(path):
     log_file_path = os.path.join(path, 'move_log.json')
@@ -109,13 +102,21 @@ def undo_last_organization(path):
         return
 
     with open(log_file_path, 'r') as log_file:
-        move_log = json.load(log_file)
+        data = json.load(log_file)
+        move_log = data.get('moves', [])
+        created_dirs = data.get('created_dirs', [])
 
     for move in reversed(move_log):
         source = move['destination']
         destination = move['source']
         shutil.move(source, destination)
         print(f"Moved {os.path.basename(source)} back to original location.")
+
+    # Remove directories that were created during the organization
+    for dir_path in created_dirs:
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
+            print(f"Removed directory {dir_path}")
 
     # Remove the log file after undoing
     os.remove(log_file_path)
@@ -133,56 +134,58 @@ if __name__ == "__main__":
     # Append '~/'
     full_path = os.path.expanduser(f"~/{user_input}")
     
-    # Ask the user for the desired action
-    action = input("Enter 'org' to organize files, 'undo' to undo the last organization, 'backup' to create a backup, 'restore' to restore from a backup, or 'delete' to delete a backup: ").strip().lower()
-    
-    if action == 'org':
-        # Create a backup of the directory
-        backup_path = backup_directory(full_path)
-        
-        # Define exceptions
-        exceptions = ['move_log.json']
-        if backup_path:
-            exceptions.append(os.path.basename(backup_path))
-        
-        # List files in the directory
-        files = list_files_in_directory(full_path)
-        
-        # Organize files by their extensions
-        organize_files_by_extension(full_path, files, exceptions)
-    elif action == 'undo':
-        # Undo the last organization
-        undo_last_organization(full_path)
-    elif action == 'backup':
-        # Create a backup of the directory
-        backup_directory(full_path)
-    elif action == 'restore':
-        # List available backups
-        backups = list_backups(os.path.dirname(full_path))
-        if backups:
-            # Ask the user to select a backup to restore
-            choice = input("Enter the number of the backup to restore: ").strip()
-            try:
-                choice_index = int(choice) - 1
-                if 0 <= choice_index < len(backups):
-                    restore_backup(full_path, backups[choice_index])
-                else:
-                    print("Invalid choice.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-    elif action == 'delete':
-        # List available backups
-        backups = list_backups(os.path.dirname(full_path))
-        if backups:
-            # Ask the user to select a backup to delete
-            choice = input("Enter the number of the backup to delete: ").strip()
-            try:
-                choice_index = int(choice) - 1
-                if 0 <= choice_index < len(backups):
-                    delete_backup(os.path.dirname(full_path), backups[choice_index])
-                else:
-                    print("Invalid choice.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
+    # Check if the directory exists
+    if not os.path.exists(full_path):
+        print(f"Error: The directory '{full_path}' does not exist.")
     else:
-        print("Invalid action. Please enter 'org', 'undo', 'backup', 'restore', or 'delete'.")
+        # Ask the user for the desired action
+        action = input("Enter 'org' to organize files, 'undo' to undo the last organization, 'backup' to create a backup, 'restore' to restore from a backup, or 'delete' to delete a backup: ").strip().lower()
+        
+        if action == 'org':
+            # Create a backup of the directory structure (currently disabled)
+            backup_directory_structure(full_path)
+            
+            # Define exceptions
+            exceptions = ['move_log.json']
+            
+            # List files in the directory
+            files = list_files_in_directory(full_path)
+            
+            # Organize files by their extensions
+            organize_files_by_extension(full_path, files, exceptions)
+        elif action == 'undo':
+            # Undo the last organization
+            undo_last_organization(full_path)
+        elif action == 'backup':
+            # Create a backup of the directory structure (currently disabled)
+            backup_directory_structure(full_path)
+        elif action == 'restore':
+            # List available backups
+            backups = list_backups(full_path)
+            if backups:
+                # Ask the user to select a backup to restore
+                choice = input("Enter the number of the backup to restore: ").strip()
+                try:
+                    choice_index = int(choice) - 1
+                    if 0 <= choice_index < len(backups):
+                        restore_directory_structure(full_path, backups[choice_index])
+                    else:
+                        print("Invalid choice.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+        elif action == 'delete':
+            # List available backups
+            backups = list_backups(full_path)
+            if backups:
+                # Ask the user to select a backup to delete
+                choice = input("Enter the number of the backup to delete: ").strip()
+                try:
+                    choice_index = int(choice) - 1
+                    if 0 <= choice_index < len(backups):
+                        delete_backup(full_path, backups[choice_index])
+                    else:
+                        print("Invalid choice.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+        else:
+            print("Invalid action. Please enter 'org', 'undo', 'backup', 'restore', or 'delete'.")
