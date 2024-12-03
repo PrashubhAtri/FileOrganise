@@ -1,8 +1,9 @@
 import os
 import shutil
+import json
 
-def print_hello_world():
-    print("Hello World")
+def print_welcome_message():
+    print("Welcome to File Organizer")
 
 def list_files_in_directory(path):
     try:
@@ -15,9 +16,11 @@ def list_files_in_directory(path):
         return []
 
 def organize_files_by_extension(path, files):
+    move_log = []  # List to store move operations for undo
+
     for file in files:
-        # Skip directories
-        if os.path.isdir(os.path.join(path, file)):
+        # Skip directories and the move_log.json file
+        if os.path.isdir(os.path.join(path, file)) or file == 'move_log.json':
             continue
         
         # Get file extension
@@ -35,8 +38,34 @@ def organize_files_by_extension(path, files):
             shutil.move(source, destination)
             print(f"Moved {file} to {extension}/")
 
+            # Log the move operation
+            move_log.append({'source': source, 'destination': destination})
+
+    # Save the move log to a file
+    with open(os.path.join(path, 'move_log.json'), 'w') as log_file:
+        json.dump(move_log, log_file)
+
+def undo_last_organization(path):
+    log_file_path = os.path.join(path, 'move_log.json')
+    
+    if not os.path.exists(log_file_path):
+        print("No move log found. Nothing to undo.")
+        return
+
+    with open(log_file_path, 'r') as log_file:
+        move_log = json.load(log_file)
+
+    for move in reversed(move_log):
+        source = move['destination']
+        destination = move['source']
+        shutil.move(source, destination)
+        print(f"Moved {os.path.basename(source)} back to original location.")
+
+    # Remove the log file after undoing
+    os.remove(log_file_path)
+
 if __name__ == "__main__":
-    print_hello_world()
+    print_welcome_message()
     
     # Prompt the user for a directory path
     user_input = input("Enter the directory path to list files (default is Desktop, '~/Desktop'): ").strip()
@@ -48,8 +77,17 @@ if __name__ == "__main__":
     # Append '~/'
     full_path = os.path.expanduser(f"~/{user_input}")
     
-    # List files in the directory
-    files = list_files_in_directory(full_path)
+    # Ask the user if they want to organize or undo
+    action = input("Enter 'org' to organize files or 'undo' to undo the last organization: ").strip().lower()
     
-    # Organize files by their extensions
-    organize_files_by_extension(full_path, files)
+    if action == 'org':
+        # List files in the directory
+        files = list_files_in_directory(full_path)
+        
+        # Organize files by their extensions
+        organize_files_by_extension(full_path, files)
+    elif action == 'undo':
+        # Undo the last organization
+        undo_last_organization(full_path)
+    else:
+        print("Invalid action. Please enter 'org' or 'undo'.")
