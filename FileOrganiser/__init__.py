@@ -6,6 +6,7 @@ from .backup import (
     restore_directory_structure,
     delete_backup
 )
+from .main import run_organiser
 
 __all__ = [
     "undo_last_organization",
@@ -13,5 +14,6 @@ __all__ = [
     "backup_directory_structure",
     "list_backups",
     "restore_directory_structure",
-    "delete_backup"
+    "delete_backup",
+    "run_organiser"
 ]
